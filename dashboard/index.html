@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>エージェントチーム ダッシュボード（構成モック）</title>
+<style>
+:root{
+  --bg:#f3f5f9; --bg-elevated:#fff; --bg-muted:#eef2ff;
+  --text:#111827; --text-muted:#6b7280; --border:#d8dee9;
+  --shadow:0 16px 40px rgba(15,23,42,.08);
+  --danger:#dc2626; --warning:#d97706; --success:#059669;
+  --accent:#2563eb; --accent-soft:rgba(37,99,235,.12);
+  --jet:#3b82f6; --nameo:#10b981; --shark:#ef4444; --secretary:#8b5cf6;
+  --p-high:#ef4444; --p-med:#f59e0b; --p-low:#9ca3af;
+  --r-lg:20px; --r-md:14px; --r-sm:10px;
+  --font:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'SFMono-Regular','Consolas','Menlo',monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0b1220; --bg-elevated:#121a2b; --bg-muted:#162238;
+  --text:#e5edf8; --text-muted:#94a3b8; --border:#25324a;
+  --shadow:0 18px 44px rgba(2,6,23,.45);
+  --accent:#60a5fa; --accent-soft:rgba(96,165,250,.18);
+}}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(180deg,var(--bg-muted) 0%,var(--bg) 220px);
+  color:var(--text);font-family:var(--font);line-height:1.5;font-size:14px}
+.shell{max-width:1180px;margin:0 auto;padding:20px 18px 60px}
+.panel{background:var(--bg-elevated);border:1px solid var(--border);
+  border-radius:var(--r-md);box-shadow:var(--shadow)}
+.muted{color:var(--text-muted)}
+.eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--accent);margin:0 0 4px;font-weight:600}
+
+/* header */
+.page-header{display:flex;justify-content:space-between;align-items:flex-start;
+  gap:16px;padding:18px 20px;margin-bottom:14px}
+.page-header h1{margin:0;font-size:20px}
+.header-meta{display:flex;gap:18px;text-align:right}
+.meta-label{display:block;font-size:11px;color:var(--text-muted)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;
+  background:var(--success);margin-right:5px}
+
+/* tabs */
+.tabs{display:flex;gap:6px;flex-wrap:wrap;padding:8px;margin-bottom:14px}
+.tab{border:1px solid transparent;background:transparent;color:var(--text-muted);
+  font-family:inherit;font-size:14px;font-weight:600;padding:9px 16px;
+  border-radius:var(--r-sm);cursor:pointer}
+.tab:hover{background:var(--bg-muted)}
+.tab.active{background:var(--accent-soft);color:var(--accent);
+  border-color:var(--accent)}
+
+.view{display:none}
+.view.active{display:block}
+
+/* summary */
+.summary{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px}
+.sum-card{padding:14px 16px;text-align:left}
+.sum-label{font-size:11px;color:var(--text-muted)}
+.sum-val{font-size:24px;font-weight:700;display:block;margin-top:4px}
+
+/* kanban */
+.kanban{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.col{padding:14px}
+.col-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.col-head h3{margin:0;font-size:14px}
+.badge{background:var(--bg-muted);border-radius:999px;padding:1px 9px;
+  font-size:12px;color:var(--text-muted)}
+.card{background:var(--bg-muted);border:1px solid var(--border);
+  border-radius:var(--r-sm);padding:11px 12px;margin-bottom:9px}
+.card .top{display:flex;gap:6px;margin-bottom:6px}
+.chip{font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;color:#fff}
+.chip.jet{background:var(--jet)} .chip.nameo{background:var(--nameo)}
+.chip.shark{background:var(--shark)} .chip.secretary{background:var(--secretary)}
+.chip.p-high{background:var(--p-high)} .chip.p-med{background:var(--p-med)}
+.chip.p-low{background:var(--p-low)}
+.card .title{font-weight:600;font-size:13px}
+.card .meta{font-size:11px;color:var(--text-muted);margin-top:4px}
+
+/* toolbar */
+.toolbar{display:flex;justify-content:space-between;align-items:center;
+  padding:14px 16px;margin-bottom:12px}
+.btn{font-family:inherit;font-size:13px;font-weight:600;padding:8px 14px;
+  border-radius:var(--r-sm);cursor:pointer;border:1px solid var(--border);
+  background:var(--bg-elevated);color:var(--text)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.queue-note{font-size:11px;color:var(--text-muted);margin-left:8px}
+
+/* generic list */
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.item{padding:14px 16px}
+.item h4{margin:0 0 4px;font-size:14px}
+.item p{margin:0;font-size:12px;color:var(--text-muted)}
+.tag{display:inline-block;font-size:10px;font-weight:600;padding:1px 7px;
+  border-radius:999px;background:var(--accent-soft);color:var(--accent);margin-top:6px}
+.row{display:flex;align-items:center;gap:10px;padding:11px 14px;
+  border-bottom:1px solid var(--border)}
+.row:last-child{border-bottom:none}
+.avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;color:#fff;font-weight:700;font-size:12px;flex-shrink:0}
+.status-pill{font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px}
+.status-pill.run{background:rgba(5,150,105,.14);color:var(--success)}
+.status-pill.idle{background:var(--bg-muted);color:var(--text-muted)}
+.doc-link{display:flex;justify-content:space-between;align-items:center;
+  padding:13px 16px;border-bottom:1px solid var(--border);cursor:pointer}
+.doc-link:last-child{border-bottom:none}
+.doc-link:hover{background:var(--bg-muted)}
+.doc-link .arrow{color:var(--accent);font-weight:700}
+.section-title{font-size:13px;font-weight:700;margin:16px 4px 8px;color:var(--text-muted)}
+
+/* toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:#111827;color:#fff;padding:11px 18px;border-radius:var(--r-sm);
+  font-size:13px;opacity:0;pointer-events:none;transition:.25s}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(max-width:760px){.summary{grid-template-columns:repeat(3,1fr)}
+  .kanban,.grid2{grid-template-columns:1fr}}
+.banner{padding:11px 16px;margin-bottom:12px;border-radius:var(--r-sm);
+  background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:600}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- HEADER -->
+  <header class="page-header panel">
+    <div>
+      <p class="eyebrow">Team Monitoring</p>
+      <h1>🐾 エージェントチーム ダッシュボード</h1>
+      <p class="muted" style="margin:4px 0 0;font-size:12px">開いた瞬間に全体が分かる・全部に飛べる</p>
+    </div>
+    <div class="header-meta">
+      <div><span class="meta-label">最終取得</span><strong>12:34</strong></div>
+      <div><span class="meta-label">状態</span><strong><span class="dot"></span>全員稼働中</strong></div>
+    </div>
+  </header>
+
+  <!-- TABS -->
+  <nav class="tabs panel">
+    <button class="tab active" data-tab="task">タスク</button>
+    <button class="tab" data-tab="project">プロジェクト</button>
+    <button class="tab" data-tab="skills">skills</button>
+    <button class="tab" data-tab="agents">エージェント</button>
+    <button class="tab" data-tab="sessions">セッション</button>
+    <button class="tab" data-tab="archive">アーカイブ</button>
+    <button class="tab" data-tab="search">検索</button>
+    <button class="tab" data-tab="rules">ルール / 思想</button>
+  </nav>
+
+  <!-- ============ TASK ============ -->
+  <section class="view active" data-view="task">
+    <div class="summary">
+      <div class="sum-card panel"><span class="sum-label">全体</span><span class="sum-val">12</span></div>
+      <div class="sum-card panel"><span class="sum-label">未着手</span><span class="sum-val">3</span></div>
+      <div class="sum-card panel"><span class="sum-label">進行中</span><span class="sum-val">4</span></div>
+      <div class="sum-card panel"><span class="sum-label">完了</span><span class="sum-val">5</span></div>
+      <div class="sum-card panel"><span class="sum-label">ブロック</span><span class="sum-val">1</span></div>
+      <div class="sum-card panel"><span class="sum-label">完了率</span><span class="sum-val">42%</span></div>
+    </div>
+
+    <div class="toolbar panel">
+      <div><p class="eyebrow">Task Board</p><strong>タスク一覧</strong></div>
+      <div>
+        <button class="btn primary" onclick="q('新規タスクをキューに追加')">＋ 振る</button>
+        <span class="queue-note">※ボタンは queue/ に書くだけ・LLMは呼ばない（サブスク内）</span>
+      </div>
+    </div>
+
+    <div class="kanban">
+      <div class="col panel"><div class="col-head"><h3>未着手</h3><span class="badge">0</span></div><p class="muted" style="font-size:12px">読み込み中…</p></div>
+      <div class="col panel"><div class="col-head"><h3>進行中</h3><span class="badge">0</span></div><p class="muted" style="font-size:12px">読み込み中…</p></div>
+      <div class="col panel"><div class="col-head"><h3>完了</h3><span class="badge">0</span></div><p class="muted" style="font-size:12px">読み込み中…</p></div>
+    </div>
+  </section>
+
+  <!-- ============ PROJECT ============ -->
+  <section class="view" data-view="project">
+    <div class="banner">read-only：進行中プロジェクト一覧。各カードから関連セッションを検索できる。</div>
+    <div class="grid2"><p class="muted">読み込み中…</p></div>
+  </section>
+
+  <!-- ============ SKILLS ============ -->
+  <section class="view" data-view="skills">
+    <div class="banner">read-only：使えるskill一覧（SKILL.md の説明文を表示）。何が呼べるか一望。</div>
+    <div class="grid2"><p class="muted">読み込み中…</p></div>
+  </section>
+
+  <!-- ============ AGENTS ============ -->
+  <section class="view" data-view="agents">
+    <div class="banner">誰が今 tmux 上で稼働しているか。操作はキュー経由（準備中）。</div>
+    <div class="panel" style="margin-bottom:12px"><p class="muted" style="padding:11px 14px;margin:0">読み込み中…</p></div>
+  </section>
+
+  <!-- ============ SESSIONS ============ -->
+  <section class="view" data-view="sessions">
+    <div class="banner">resume できる会話の一覧（最近60件）。コマンドをコピーして貼れば続きから開けます。read-only・LLMは呼ばない。</div>
+    <div id="sessList"><p class="muted">読み込み中…</p></div>
+  </section>
+
+  <!-- ============ ARCHIVE ============ -->
+  <section class="view" data-view="archive">
+    <div class="banner">アーカイブ済みセッション（最近60件）。戻したいものは「復元コマンド」をコピーして実行すれば active に戻ります。古いものは「検索」タブの生ログ検索から掘れます。</div>
+    <div id="archList"><p class="muted">読み込み中…</p></div>
+  </section>
+
+  <!-- ============ SEARCH ============ -->
+  <section class="view" data-view="search">
+    <div class="banner">記憶（FTS5索引）と生ログ（全transcript）を横断検索。LLMは呼ばない＝コストゼロ。</div>
+    <div class="toolbar panel">
+      <input id="sq" placeholder="検索ワード（日本語OK）" style="flex:1;min-width:200px;padding:8px;border-radius:8px;border:1px solid #d1d5db" onkeydown="if(event.key==='Enter')doSearch('session')">
+      <button class="btn primary" onclick="doSearch('session')">セッションを検索</button>
+      <button class="btn" onclick="doSearch('memory')">記憶を検索</button>
+      <button class="btn" onclick="doSearch('log')">生ログ(詳細)</button>
+    </div>
+    <div id="searchResults"></div>
+  </section>
+
+  <!-- ============ RULES ============ -->
+  <section class="view" data-view="rules">
+    <div class="banner">read-only：チームのルール・方針ドキュメントへの入口。クリックで本文表示。</div>
+    <div class="section-title">ドキュメント</div>
+    <div class="panel"><p class="muted" style="padding:11px 14px;margin:0">読み込み中…</p></div>
+  </section>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+document.querySelectorAll('.tab').forEach(t=>{
+  t.onclick=()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.querySelector('.view[data-view="'+t.dataset.tab+'"]').classList.add('active');
+  };
+});
+
+async function jget(p){ try{ const r=await fetch(p,{cache:'no-store'}); return await r.json(); }catch(e){ return null; } }
+function renderInto(view,sel,html){ const el=document.querySelector('.view[data-view="'+view+'"] '+sel); if(el) el.innerHTML=html; }
+function esc(s){ return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function fm(content,key){ const m=(content||'').match(new RegExp('^'+key+':\\s*(.+)$','m')); return m?m[1].trim():''; }
+
+// プロジェクト→関連セッション検索: 既定キーワードは project_*.md の `searchKeyword:` 行から取得（無ければ名前）
+function findProjectSessions(kw){
+  const tab=document.querySelector('.tab[data-tab="search"]'); if(tab) tab.click();
+  const inp=document.getElementById('sq'); if(inp) inp.value=kw;
+  doSearch('session');
+}
+async function loadProjects(){
+  const d=await jget('/api/projects'); if(!d) return;
+  renderInto('project','.grid2', d.files.map(f=>{
+    const name=f.name.replace('project_','').replace('.md','');
+    const desc=fm(f.content,'description');
+    const sm=(f.content||'').match(/\*\*状態[:：]\s*([^*\n]+)/);
+    const state=sm?sm[1].trim():'';
+    const kw=(fm(f.content,'searchKeyword')||name).replace(/'/g,'');
+    return '<div class="item panel"><h4>📁 '+esc(name)+'</h4>'+(state?'<p style="color:var(--accent)"><b>'+esc(state)+'</b></p>':'')+'<p>'+esc(desc)+'</p><span class="tag">'+esc(f.name)+'</span>'
+      +'<div style="margin-top:8px"><button class="btn" onclick="findProjectSessions(\''+esc(kw)+'\')">🔍 関連セッションを探す</button></div></div>';
+  }).join('') || '<p class="muted">プロジェクトなし</p>');
+}
+async function loadSkills(){
+  const d=await jget('/api/skills'); if(!d) return;
+  renderInto('skills','.grid2', d.skills.map(s=>'<div class="item panel"><h4>'+esc(s.name)+'</h4><p>'+esc(fm(s.content,'description').slice(0,140))+'</p></div>').join(''));
+}
+async function loadAgents(){
+  const d=await jget('/api/agents'); if(!d) return;
+  const rows=d.panes.filter(p=>/claude/i.test(p.command)).map(p=>
+    '<div class="row"><div style="flex:1"><strong>'+esc(p.title)+'</strong><div class="muted" style="font-size:12px">'+esc(p.window)+'</div></div><span class="status-pill run">稼働中</span></div>'
+  ).join('');
+  renderInto('agents','.panel', rows+'<div class="muted" style="font-size:11px;margin-top:10px">※ agmsg最新メッセージ・操作ボタンは準備中（連携層／queue分離の実装後に接続）</div>');
+}
+async function loadDocs(){
+  const d=await jget('/api/docs'); if(!d) return;
+  renderInto('rules','.panel', d.docs.map(x=>'<div class="doc-link" data-path="'+esc(x.path)+'" data-label="'+esc(x.label)+'" onclick="showDoc(this)"><span>📜 '+esc(x.label)+'</span><span class="arrow">→</span></div>').join(''));
+}
+async function showDoc(el){ const d=await jget('/api/docs?path='+encodeURIComponent(el.dataset.path)); if(d&&d.content) alert(el.dataset.label+'\n\n'+d.content.slice(0,3000)); }
+async function loadTasks(){
+  const d=await jget('/api/tasks'); if(!d) return;
+  const tasks=d.files.map(f=>({title:fm(f.content,'title'),status:fm(f.content,'status'),assigned:fm(f.content,'assigned_to'),priority:fm(f.content,'priority')}));
+  const g={pending:[],in_progress:[],completed:[]}; tasks.forEach(t=>{ if(g[t.status]) g[t.status].push(t); });
+  const card=t=>'<div class="card"><div class="top"><span class="chip '+esc(t.assigned||'')+'">'+esc(t.assigned||'-')+'</span><span class="chip p-'+({high:'high',medium:'med',low:'low'}[t.priority]||'low')+'">'+esc(t.priority||'-')+'</span></div><div class="title">'+esc(t.title)+'</div></div>';
+  const cols=document.querySelectorAll('.view[data-view="task"] .kanban .col');
+  const sets=[['未着手',g.pending],['進行中',g.in_progress],['完了',g.completed]];
+  cols.forEach((c,i)=>{ if(sets[i]) c.innerHTML='<div class="col-head"><h3>'+sets[i][0]+'</h3><span class="badge">'+sets[i][1].length+'</span></div>'+sets[i][1].map(card).join(''); });
+  const sv=document.querySelectorAll('.view[data-view="task"] .summary .sum-val');
+  if(sv.length>=6){ const tot=tasks.length,c=g.completed.length; [tot,g.pending.length,g.in_progress.length,c,0,(tot?Math.round(c/tot*100):0)+'%'].forEach((v,i)=>{ if(sv[i]) sv[i].textContent=v; }); }
+}
+function q(label){ const el=document.getElementById('toast'); if(el){ el.textContent='準備中: '+label+'（操作はqueue分離の実装後に有効化）'; el.classList.add('show'); clearTimeout(window._tt); window._tt=setTimeout(()=>el.classList.remove('show'),2600);} }
+
+function copyText(btn,txt){
+  const done=()=>{ const o=btn.textContent; btn.textContent='✓ コピー済'; setTimeout(()=>{btn.textContent=o;},1500); };
+  const fallback=()=>{ const ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');done();}catch(e){} ta.remove(); };
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done,fallback); } else { fallback(); }
+}
+async function loadSessions(){
+  const d=await jget('/api/sessions'); if(!d||!d.sessions){ renderInto('sessions','#sessList','<p class="muted">取得失敗</p>'); return; }
+  const summary='<div class="toolbar panel" style="margin-bottom:10px"><div><p class="eyebrow">Sessions</p><strong>全 '+(d.total||0)+' 件</strong></div>'
+    +'<div class="muted" style="font-size:12px">稼働中 '+(d.liveCount||0)+' ・ 一覧表示 '+(d.shown||d.sessions.length)+'（新しい順）</div></div>';
+  const html=summary+d.sessions.map(s=>{
+    const proj=(s.cwd||s.project||'').split('/').slice(-2).join('/');
+    const when=(s.modifiedAt||'').replace('T',' ').slice(5,16);
+    const cmd=esc(s.resumeCmd);
+    return '<div class="item panel" style="margin-bottom:8px">'
+      +'<div class="row"><span class="chip '+(s.live?'p-high':'')+'">'+(s.live?'稼働中':'過去')+'</span>'
+      +'<div style="flex:1"><strong>'+esc(s.first||'(発話なし)')+'</strong>'
+      +'<div class="muted" style="font-size:11px">'+esc(proj)+' ・ '+esc(when)+' ・ '+s.sizeKB+'KB ・ '+esc(s.sessionId.slice(0,8))+'…</div></div></div>'
+      +'<div class="row" style="margin-top:6px"><code style="flex:1;font-size:11px;overflow:auto;white-space:nowrap;background:#f3f4f6;padding:6px;border-radius:6px">'+cmd+'</code>'
+      +'<button class="btn" data-cmd="'+cmd+'" onclick="copyText(this,this.dataset.cmd)">コピー</button></div>'
+      +'</div>';
+  }).join('');
+  renderInto('sessions','#sessList', html||'<p class="muted">セッションなし</p>');
+}
+async function doSearch(kind){
+  const q=(document.getElementById('sq').value||'').trim();
+  const box=document.getElementById('searchResults');
+  if(!q){ box.innerHTML='<p class="muted">検索ワードを入れてください</p>'; return; }
+  box.innerHTML='<p class="muted">検索中…</p>';
+  if(kind==='session'){
+    const d=await jget('/api/session-search?q='+encodeURIComponent(q));
+    if(!d||d.error){ box.innerHTML='<p class="muted">セッション検索エラー: '+esc((d&&d.message)||'')+'</p>'; return; }
+    box.innerHTML='<div class="section-title">セッション '+(d.shown||0)+'件表示（該当 '+(d.total||0)+'件・新しい順・本物のセッションのみ）</div>'+((d.hits||[]).map(h=>{
+      const cmd=esc(h.archived?(h.restoreCmd||''):(h.resumeCmd||''));
+      const lbl=h.archived?'復元コマンドをコピー':'resumeコマンドをコピー';
+      const proj=(h.cwd||h.project||'').split('/').slice(-2).join('/');
+      const when=(h.modifiedAt||'').replace('T',' ').slice(5,16);
+      return '<div class="item panel" style="margin-bottom:6px"><div class="row"><span class="chip '+(h.archived?'':'p-high')+'">'+(h.archived?'archive':'active')+'</span>'
+        +'<div style="flex:1"><strong>'+esc(h.first||'(発話なし)')+'</strong><div class="muted" style="font-size:11px">'+esc(proj)+' ・ '+esc(when)+' ・ '+esc(h.sessionId.slice(0,8))+'…</div></div></div>'
+        +'<div class="row" style="margin-top:4px"><code style="flex:1;font-size:11px;overflow:auto;white-space:nowrap;background:#f3f4f6;padding:6px;border-radius:6px">'+cmd+'</code><button class="btn" data-cmd="'+cmd+'" onclick="copyText(this,this.dataset.cmd)">'+lbl+'</button></div></div>';
+    }).join('')||'<p class="muted">該当なし</p>');
+  } else if(kind==='memory'){
+    const d=await jget('/api/memory-search?q='+encodeURIComponent(q));
+    if(!d||d.error){ box.innerHTML='<p class="muted">記憶検索エラー: '+esc((d&&d.message)||'')+'</p>'; return; }
+    box.innerHTML='<div class="section-title">記憶 '+((d.hits&&d.hits.length)||0)+'件</div>'+((d.hits||[]).map(h=>
+      '<div class="item panel" style="margin-bottom:6px"><h4>'+esc((h.source||'').split('/').pop())+(h.heading?' › '+esc(h.heading):'')+'</h4><p>'+esc((h.content||'').replace(/\n/g,' ').slice(0,300))+'</p></div>'
+    ).join('')||'<p class="muted">該当なし</p>');
+  } else {
+    const d=await jget('/api/log-search?q='+encodeURIComponent(q));
+    if(!d||d.error){ box.innerHTML='<p class="muted">生ログ検索エラー: '+esc((d&&d.message)||'')+'</p>'; return; }
+    box.innerHTML='<div class="section-title">生ログ '+((d.hits&&d.hits.length)||0)+'件（各セッション最初の一致）</div>'+((d.hits||[]).map(h=>{
+      const cmd='claude --resume '+h.sessionId+' --dangerously-skip-permissions';
+      return '<div class="item panel" style="margin-bottom:6px"><h4>'+esc(h.sessionId.slice(0,8))+'… <span class="muted" style="font-size:11px">'+esc(h.project)+'</span></h4>'
+        +'<p style="font-size:11px">'+esc(h.snippet)+'</p>'
+        +'<div class="row" style="margin-top:4px"><code style="flex:1;font-size:11px;background:#f3f4f6;padding:4px;border-radius:6px">'+esc(cmd)+'</code><button class="btn" data-cmd="'+esc(cmd)+'" onclick="copyText(this,this.dataset.cmd)">コピー</button></div></div>';
+    }).join('')||'<p class="muted">該当なし</p>');
+  }
+}
+
+async function loadArchive(){
+  const d=await jget('/api/archive'); if(!d||!d.sessions){ renderInto('archive','#archList','<p class="muted">取得失敗</p>'); return; }
+  const summary='<div class="toolbar panel" style="margin-bottom:10px"><div><p class="eyebrow">Archive</p><strong>全 '+(d.total||0)+' 件</strong></div>'
+    +'<div class="muted" style="font-size:12px">一覧表示 '+(d.shown||d.sessions.length)+'（新しい順）・古いものは検索から</div></div>';
+  const html=summary+d.sessions.map(s=>{
+    const proj=(s.cwd||s.project||'').split('/').slice(-2).join('/');
+    const when=(s.modifiedAt||'').replace('T',' ').slice(5,16);
+    const rc=esc(s.restoreCmd||'');
+    return '<div class="item panel" style="margin-bottom:8px">'
+      +'<div class="row"><span class="chip">archive</span><div style="flex:1"><strong>'+esc(s.first||'(発話なし)')+'</strong>'
+      +'<div class="muted" style="font-size:11px">'+esc(proj)+' ・ '+esc(when)+' ・ '+s.sizeKB+'KB ・ '+esc(s.sessionId.slice(0,8))+'…</div></div></div>'
+      +'<div class="row" style="margin-top:6px"><code style="flex:1;font-size:11px;overflow:auto;white-space:nowrap;background:#f3f4f6;padding:6px;border-radius:6px">'+rc+'</code>'
+      +'<button class="btn" data-cmd="'+rc+'" onclick="copyText(this,this.dataset.cmd)">復元コマンドをコピー</button></div>'
+      +'</div>';
+  }).join('');
+  renderInto('archive','#archList', html||'<p class="muted">アーカイブなし</p>');
+}
+
+loadProjects(); loadSkills(); loadAgents(); loadDocs(); loadTasks(); loadSessions(); loadArchive();
+setInterval(()=>{ loadTasks(); loadAgents(); loadSessions(); }, 30000);
+</script>
+</body>
+</html>

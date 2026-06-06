@@ -1,0 +1,68 @@
+{
+  "_comment": "これはテンプレートです。コピーして config.json を作り、各組織の値に置き換えてください（config.json は .gitignore 済み）。<...> はプレースホルダ。",
+  "siteTitle": "エージェントチーム監視ダッシュボード",
+  "teamName": "<YOUR TEAM NAME>",
+  "timezone": "Asia/Tokyo",
+  "taskDir": "../tasks",
+  "polling": {
+    "taskIntervalSec": 30
+  },
+  "heartbeat": {
+    "enabled": true,
+    "excludeBlocked": true,
+    "lockTtlSec": 14400,
+    "scriptLockStaleSec": 1800
+  },
+  "ui": {
+    "mobileBreakpoint": 768,
+    "showCopyButtonsOnMobile": false,
+    "desktopColumns": 3,
+    "completedPreviewCount": 8
+  },
+  "agents": {
+    "agent1": { "label": "Agent 1", "color": "#3B82F6" },
+    "agent2": { "label": "Agent 2", "color": "#10B981" }
+  },
+  "serverOnly": {
+    "host": "0.0.0.0",
+    "allowedHosts": [
+      "127.0.0.1",
+      "localhost",
+      "<TAILSCALE_IP>",
+      "<TAILSCALE_HOSTNAME>"
+    ],
+    "startCommands": {
+      "agent1": "cd <ABS_PATH>/agent1/workspace && source ~/.nvm/nvm.sh && claude --dangerously-skip-permissions"
+    },
+    "dataSources": {
+      "projectsDir": "<HOME>/.claude/projects/<ENCODED_LEAD_CWD>/memory",
+      "skillsDir": "<HOME>/.claude/skills",
+      "docs": [
+        { "label": "CLAUDE.md", "path": "<HOME>/.claude/CLAUDE.md" }
+      ],
+      "sessions": {
+        "projectsRoot": "<HOME>/.claude/projects",
+        "liveRegistryDir": "<HOME>/.claude/sessions",
+        "limit": 60
+      },
+      "archive": {
+        "root": "<HOME>/.claude/projects-archive",
+        "limit": 60,
+        "restoreScript": "<ABS_PATH>/agent-team-pack/scripts/manage_sessions.sh"
+      },
+      "memorySearch": {
+        "python": "python3",
+        "script": "<ABS_PATH>/agent-team-pack/memory_system/index_memory.py",
+        "memoryDirs": [
+          "<HOME>/.claude/projects/<ENCODED_LEAD_CWD>/memory"
+        ]
+      },
+      "logSearch": {
+        "transcriptsRoots": [
+          "<HOME>/.claude/projects",
+          "<HOME>/.claude/projects-archive"
+        ]
+      }
+    }
+  }
+}

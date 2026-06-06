@@ -1,0 +1,28 @@
+# 索引DB（mdから再構築可能・記憶内容を含むので非コミット）
+memory_index.db
+*.db
+*.db-wal
+*.db-shm
+
+# バックアップ
+*.bak
+*.bak_*
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# OS
+.DS_Store
+
+# どうぶつえん固有のダッシュボード設定（テンプレは dashboard/config.example.json）
+dashboard/config.json
+
+# ランタイム生成物
+dashboard/*.log
+dashboard/.heartbeat*
+dashboard/heartbeat.cron.log
+
+# 公開前ガードの組織固有パターン（自社の固有名/IP）
+scripts/secret_patterns.local

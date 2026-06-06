@@ -1,0 +1,13 @@
+{
+  "name": "doubutuen-agent-tools",
+  "owner": { "name": "合同会社どうぶつえん" },
+  "description": "サブスク枠内でAIエージェントチームを運用する基盤ツール群（追加課金ゼロ）。",
+  "plugins": [
+    {
+      "name": "agent-team-pack",
+      "source": ".",
+      "description": "永続記憶＋監視ダッシュボード＋セッション管理。サブスク枠内・追加課金ゼロ。",
+      "version": "0.1.0"
+    }
+  ]
+}

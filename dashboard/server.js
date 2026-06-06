@@ -232,7 +232,29 @@ async function sessionHead(fp) {
       if (cwd && first) break;
     }
   } catch (_e) { /* skip */ }
-  return { cwd, first };
+
+  // Claude 自動生成の aiTitle を末尾から取得（内容反映タイトル・最新を採用）
+  let aiTitle = '';
+  try {
+    const st = await fsp.stat(fp);
+    const TAIL = 65536;
+    const start = Math.max(0, st.size - TAIL);
+    const len = st.size - start;
+    if (len > 0) {
+      const fd2 = await fsp.open(fp, 'r');
+      const buf2 = Buffer.alloc(len);
+      await fd2.read(buf2, 0, len, start);
+      await fd2.close();
+      for (const line of buf2.toString('utf8').split('\n')) {
+        if (!line.includes('ai-title')) continue;
+        let o;
+        try { o = JSON.parse(line); } catch (_e) { continue; }
+        if (o.type === 'ai-title' && o.aiTitle) aiTitle = o.aiTitle; // 最後=最新
+      }
+    }
+  } catch (_e) { /* skip */ }
+
+  return { cwd, first, aiTitle, title: aiTitle || first };
 }
 
 // 本物のセッション（プロジェクト直下の UUID 名 *.jsonl）だけに絞った検索。サブエージェント/ツール結果を除外。
@@ -268,12 +290,13 @@ async function sessionSearch(config, q, limit) {
   const picked = matched.slice(0, limit || 40);
   const hits = [];
   for (const p of picked) {
-    const { cwd, first } = await sessionHead(p.fp);
+    const { cwd, first, title } = await sessionHead(p.fp);
     hits.push({
       sessionId: p.base,
       project: p.parent,
       cwd,
       first: first.slice(0, 160),
+      title: (title || first).slice(0, 160),
       archived: p.archived,
       modifiedAt: p.mtime ? new Date(p.mtime).toISOString() : '',
       resumeCmd: (cwd ? `cd "${cwd}" && ` : '') + `claude --resume ${p.base} --dangerously-skip-permissions`,
@@ -306,7 +329,7 @@ async function scanSessions(root, limit, live) {
 
   const out = [];
   for (const e of top) {
-    const { cwd, first } = await sessionHead(e.fp);
+    const { cwd, first, title } = await sessionHead(e.fp);
     out.push({
       sessionId: e.sessionId,
       cwd,
@@ -315,6 +338,7 @@ async function scanSessions(root, limit, live) {
       sizeKB: Math.round(e.size / 1024),
       live: live ? live.has(e.sessionId) : false,
       first: first.slice(0, 160),
+      title: (title || first).slice(0, 160),
       resumeCmd: (cwd ? `cd "${cwd}" && ` : '') + `claude --resume ${e.sessionId} --dangerously-skip-permissions`
     });
   }

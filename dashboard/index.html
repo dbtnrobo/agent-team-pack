@@ -314,11 +314,11 @@ async function loadSessions(){
     const cmd=esc(s.resumeCmd);
     return '<div class="item panel" style="margin-bottom:8px">'
       +'<div class="row"><span class="chip '+(s.live?'p-high':'')+'">'+(s.live?'稼働中':'過去')+'</span>'
-      +'<div style="flex:1"><strong>'+esc(s.first||'(発話なし)')+'</strong>'
+      +'<div style="flex:1"><strong>'+esc(s.title||s.first||'(発話なし)')+'</strong>'
       +'<div class="muted" style="font-size:11px">'+esc(proj)+' ・ '+esc(when)+' ・ '+s.sizeKB+'KB ・ '+esc(s.sessionId.slice(0,8))+'…</div></div></div>'
       +'<div class="row" style="margin-top:6px"><code style="flex:1;font-size:11px;overflow:auto;white-space:nowrap;background:#f3f4f6;padding:6px;border-radius:6px">'+cmd+'</code>'
       +'<button class="btn" data-cmd="'+cmd+'" onclick="copyText(this,this.dataset.cmd)">コピー</button>'
-      +(s.live?'':'<button class="btn" onclick="archiveSession(\''+s.sessionId+'\',this)">📦 退避</button>')
+      +(s.live?'':'<button class="btn" onclick="archiveSession(\''+s.sessionId+'\',this)">📦 アーカイブ</button>')
       +'</div></div>';
   }).join('');
   renderInto('sessions','#sessList', html||'<p class="muted">セッションなし</p>');
@@ -337,7 +337,7 @@ async function doSearch(kind){
       const proj=(h.cwd||h.project||'').split('/').slice(-2).join('/');
       const when=(h.modifiedAt||'').replace('T',' ').slice(5,16);
       return '<div class="item panel" style="margin-bottom:6px"><div class="row"><span class="chip '+(h.archived?'':'p-high')+'">'+(h.archived?'archive':'active')+'</span>'
-        +'<div style="flex:1"><strong>'+esc(h.first||'(発話なし)')+'</strong><div class="muted" style="font-size:11px">'+esc(proj)+' ・ '+esc(when)+' ・ '+esc(h.sessionId.slice(0,8))+'…</div></div></div>'
+        +'<div style="flex:1"><strong>'+esc(h.title||h.first||'(発話なし)')+'</strong><div class="muted" style="font-size:11px">'+esc(proj)+' ・ '+esc(when)+' ・ '+esc(h.sessionId.slice(0,8))+'…</div></div></div>'
         +'<div class="row" style="margin-top:4px"><code style="flex:1;font-size:11px;overflow:auto;white-space:nowrap;background:#f3f4f6;padding:6px;border-radius:6px">'+cmd+'</code><button class="btn" data-cmd="'+cmd+'" onclick="copyText(this,this.dataset.cmd)">'+lbl+'</button></div></div>';
     }).join('')||'<p class="muted">該当なし</p>');
   } else if(kind==='memory'){
@@ -367,7 +367,7 @@ async function loadArchive(){
     const when=(s.modifiedAt||'').replace('T',' ').slice(5,16);
     return '<div class="item panel" style="margin-bottom:8px">'
       +'<div class="row"><span class="chip">archive</span>'
-      +'<div style="flex:1"><strong>'+esc(s.first||'(発話なし)')+'</strong>'
+      +'<div style="flex:1"><strong>'+esc(s.title||s.first||'(発話なし)')+'</strong>'
       +'<div class="muted" style="font-size:11px">'+esc(proj)+' ・ '+esc(when)+' ・ '+s.sizeKB+'KB ・ '+esc(s.sessionId.slice(0,8))+'…</div></div>'
       +'<button class="btn primary" onclick="restoreSession(\''+s.sessionId+'\',this)">↩ 復元</button></div>'
       +'</div>';

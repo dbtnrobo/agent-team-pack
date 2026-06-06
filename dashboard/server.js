@@ -365,6 +365,30 @@ function logSearch(config, q, limit) {
   });
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+// <root>/<projectFolder>/<id>.jsonl を探す
+async function findSessionFile(root, id) {
+  if (!root) return null;
+  let dirs = [];
+  try { dirs = (await fsp.readdir(root, { withFileTypes: true })).filter((d) => d.isDirectory()); } catch (_e) { return null; }
+  for (const d of dirs) {
+    const fp = path.join(root, d.name, `${id}.jsonl`);
+    try { await fsp.access(fp); return { fp, folder: d.name }; } catch (_e) { /* next */ }
+  }
+  return null;
+}
+
+// セッション jsonl を fromRoot → toRoot へ移動（元のプロジェクトフォルダ名を維持）。中身不変・可逆。
+async function moveSessionFile(id, fromRoot, toRoot) {
+  const found = await findSessionFile(fromRoot, id);
+  if (!found) return { error: 'not_found' };
+  const destDir = path.join(toRoot, found.folder);
+  await fsp.mkdir(destDir, { recursive: true });
+  await fsp.rename(found.fp, path.join(destDir, `${id}.jsonl`));
+  return { ok: true, id, folder: found.folder };
+}
+
 async function handleApi(req, res, config, url) {
   if (url.pathname === '/api/config') {
     return json(res, 200, {
@@ -499,6 +523,35 @@ async function handleApi(req, res, config, url) {
     return json(res, r.error ? 500 : 200, { ...r, query: q, generatedAt: nowIso() });
   }
 
+  if (url.pathname === '/api/archive-session') {
+    const id = (url.searchParams.get('id') || '').trim();
+    if (!UUID_RE.test(id)) return json(res, 400, { error: 'bad_id', generatedAt: nowIso() });
+    const cfg = config.serverOnly?.dataSources?.sessions || {};
+    const live = await liveSessionSet(cfg.liveRegistryDir);
+    if (live.has(id)) return json(res, 409, { error: 'session_live', message: '稼働中のセッションは退避できません。', generatedAt: nowIso() });
+    const projectsRoot = cfg.projectsRoot;
+    const archiveRoot = config.serverOnly?.dataSources?.archive?.root;
+    try {
+      const r = await moveSessionFile(id, projectsRoot, archiveRoot);
+      return json(res, r.ok ? 200 : 404, { ...r, generatedAt: nowIso() });
+    } catch (error) {
+      return json(res, 500, { error: 'archive_move_failed', message: error.message, generatedAt: nowIso() });
+    }
+  }
+
+  if (url.pathname === '/api/restore-session') {
+    const id = (url.searchParams.get('id') || '').trim();
+    if (!UUID_RE.test(id)) return json(res, 400, { error: 'bad_id', generatedAt: nowIso() });
+    const projectsRoot = config.serverOnly?.dataSources?.sessions?.projectsRoot;
+    const archiveRoot = config.serverOnly?.dataSources?.archive?.root;
+    try {
+      const r = await moveSessionFile(id, archiveRoot, projectsRoot);
+      return json(res, r.ok ? 200 : 404, { ...r, generatedAt: nowIso() });
+    } catch (error) {
+      return json(res, 500, { error: 'restore_move_failed', message: error.message, generatedAt: nowIso() });
+    }
+  }
+
   if (url.pathname === '/api/health') {
     return json(res, 200, {
       status: 'ok',
@@ -530,10 +583,14 @@ const server = http.createServer(async (req, res) => {
     const config = readConfig();
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
-    if (!['GET', 'HEAD'].includes(req.method || 'GET')) {
+    // 原則 read-only（GET/HEAD）。例外: セッションのアーカイブ/復元は純ファイル移動(LLM非依存)なので POST を許可。
+    const mutatingPaths = ['/api/archive-session', '/api/restore-session'];
+    const method = req.method || 'GET';
+    const allowed = ['GET', 'HEAD'].includes(method) || (method === 'POST' && mutatingPaths.includes(url.pathname));
+    if (!allowed) {
       return json(res, 405, {
         error: 'method_not_allowed',
-        message: 'GET / HEAD のみ利用できます。',
+        message: 'GET / HEAD のみ利用できます（archive/restore のみ POST 可）。',
         generatedAt: nowIso()
       });
     }

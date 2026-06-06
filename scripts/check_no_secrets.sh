@@ -10,8 +10,8 @@
 set -uo pipefail
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# 1) 汎用パターン（秘密鍵・各種APIトークン）
-PATTERNS='sk-ant-[A-Za-z0-9_-]{8,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|xox[baprs]-[0-9A-Za-z-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----'
+# 1) 汎用パターン（秘密鍵・各種APIトークン・個人の絶対パス）
+PATTERNS='sk-ant-[A-Za-z0-9_-]{8,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|xox[baprs]-[0-9A-Za-z-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|/home/[A-Za-z0-9_.-]+/|/Users/[A-Za-z0-9_.-]+/'
 
 # 2) 組織固有パターン（あれば追加）
 LOCAL="scripts/secret_patterns.local"

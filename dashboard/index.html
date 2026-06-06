@@ -293,6 +293,17 @@ function copyText(btn,txt){
   const fallback=()=>{ const ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');done();}catch(e){} ta.remove(); };
   if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done,fallback); } else { fallback(); }
 }
+async function postAction(path,id,btn){
+  const o=btn.textContent; btn.disabled=true; btn.textContent='…';
+  try{
+    const r=await fetch(path+'?id='+encodeURIComponent(id),{method:'POST'});
+    const d=await r.json().catch(()=>({}));
+    if(r.ok&&d.ok){ btn.textContent='✓'; setTimeout(()=>{ loadSessions(); loadArchive(); },350); }
+    else { btn.textContent=o; btn.disabled=false; alert('失敗: '+((d&&(d.message||d.error))||r.status)); }
+  }catch(e){ btn.textContent=o; btn.disabled=false; alert('通信失敗'); }
+}
+function archiveSession(id,btn){ if(confirm('このセッションをアーカイブに退避しますか？\n'+id.slice(0,8)+'…\n（中身は不変・あとで復元可）')) postAction('/api/archive-session',id,btn); }
+function restoreSession(id,btn){ postAction('/api/restore-session',id,btn); }
 async function loadSessions(){
   const d=await jget('/api/sessions'); if(!d||!d.sessions){ renderInto('sessions','#sessList','<p class="muted">取得失敗</p>'); return; }
   const summary='<div class="toolbar panel" style="margin-bottom:10px"><div><p class="eyebrow">Sessions</p><strong>全 '+(d.total||0)+' 件</strong></div>'
@@ -306,8 +317,9 @@ async function loadSessions(){
       +'<div style="flex:1"><strong>'+esc(s.first||'(発話なし)')+'</strong>'
       +'<div class="muted" style="font-size:11px">'+esc(proj)+' ・ '+esc(when)+' ・ '+s.sizeKB+'KB ・ '+esc(s.sessionId.slice(0,8))+'…</div></div></div>'
       +'<div class="row" style="margin-top:6px"><code style="flex:1;font-size:11px;overflow:auto;white-space:nowrap;background:#f3f4f6;padding:6px;border-radius:6px">'+cmd+'</code>'
-      +'<button class="btn" data-cmd="'+cmd+'" onclick="copyText(this,this.dataset.cmd)">コピー</button></div>'
-      +'</div>';
+      +'<button class="btn" data-cmd="'+cmd+'" onclick="copyText(this,this.dataset.cmd)">コピー</button>'
+      +(s.live?'':'<button class="btn" onclick="archiveSession(\''+s.sessionId+'\',this)">📦 退避</button>')
+      +'</div></div>';
   }).join('');
   renderInto('sessions','#sessList', html||'<p class="muted">セッションなし</p>');
 }
@@ -353,12 +365,11 @@ async function loadArchive(){
   const html=summary+d.sessions.map(s=>{
     const proj=(s.cwd||s.project||'').split('/').slice(-2).join('/');
     const when=(s.modifiedAt||'').replace('T',' ').slice(5,16);
-    const rc=esc(s.restoreCmd||'');
     return '<div class="item panel" style="margin-bottom:8px">'
-      +'<div class="row"><span class="chip">archive</span><div style="flex:1"><strong>'+esc(s.first||'(発話なし)')+'</strong>'
-      +'<div class="muted" style="font-size:11px">'+esc(proj)+' ・ '+esc(when)+' ・ '+s.sizeKB+'KB ・ '+esc(s.sessionId.slice(0,8))+'…</div></div></div>'
-      +'<div class="row" style="margin-top:6px"><code style="flex:1;font-size:11px;overflow:auto;white-space:nowrap;background:#f3f4f6;padding:6px;border-radius:6px">'+rc+'</code>'
-      +'<button class="btn" data-cmd="'+rc+'" onclick="copyText(this,this.dataset.cmd)">復元コマンドをコピー</button></div>'
+      +'<div class="row"><span class="chip">archive</span>'
+      +'<div style="flex:1"><strong>'+esc(s.first||'(発話なし)')+'</strong>'
+      +'<div class="muted" style="font-size:11px">'+esc(proj)+' ・ '+esc(when)+' ・ '+s.sizeKB+'KB ・ '+esc(s.sessionId.slice(0,8))+'…</div></div>'
+      +'<button class="btn primary" onclick="restoreSession(\''+s.sessionId+'\',this)">↩ 復元</button></div>'
       +'</div>';
   }).join('');
   renderInto('archive','#archList', html||'<p class="muted">アーカイブなし</p>');

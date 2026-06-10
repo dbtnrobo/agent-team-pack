@@ -8,6 +8,39 @@ Claude Code 等の CLI エージェントチームを **サブスク枠内（LLM
 
 > 監視ダッシュボードのデモ（表示はすべてサンプルデータ）。`dashboard/demo.html` をブラウザで開けば単体で確認できる。
 
+## 前提（必要なもの）
+
+| 用途 | 必要なもの |
+|---|---|
+| ダッシュボードを動かす | **Node.js 20 以上**（本体は標準ライブラリのみ・テストは `node:test`） |
+| 記憶層を使う | **Python 3**（FTS5 が有効な SQLite。標準でほぼ有効） |
+| プラグインとして導入する | **Claude Code CLI**（`claude`） |
+| 「エージェント」タブで稼働状況を見る | **tmux**（`agents` という名のセッション。任意） |
+
+> まず触ってみるだけなら何もインストール不要 —— `dashboard/demo.html` をブラウザで開くだけ。
+
+## クイックスタート
+
+目的に応じて 2 経路。**A だけでもダッシュボードは完結して使える。**
+
+**A. ダッシュボードだけ動かす（最小・推奨の入口）**
+```bash
+git clone https://github.com/dbtnrobo/agent-team-pack.git
+cd agent-team-pack/dashboard
+cp config.example.json config.json   # <...> プレースホルダを自分の環境に置き換える（後述）
+node server.js                        # http://127.0.0.1:8080
+```
+
+**B. フル導入（Claude Code プラグイン＝記憶フック＋ダッシュボード監視も入れる）**
+```bash
+git clone https://github.com/dbtnrobo/agent-team-pack.git && cd agent-team-pack
+bash install.sh                       # 依存チェック → marketplace 登録 → plugin 導入
+```
+
+> **会社／他人の PC で使っても安全**: 環境固有の値（パス・ホスト・チーム名・起動コマンド）は
+> すべて `dashboard/config.json` に隔離され、これは `.gitignore` 済みでリポジトリに入らない。
+> clone される公開ツリーに自分の固有情報が混ざることはない（混入防止チェックは「公開前チェック」参照）。
+
 ## 収録物
 
 ```
@@ -85,6 +118,19 @@ cd dashboard
 cp config.example.json config.json   # <...> の値を自分の環境に置き換える
 node server.js                        # 既定 :8080（config.json の serverOnly で host/allowedHosts を制御）
 ```
+
+`config.json` で置き換えるプレースホルダ:
+
+| プレースホルダ | 意味 | 例 |
+|---|---|---|
+| `<YOUR TEAM NAME>` | 画面に出すチーム名 | `My Team` |
+| `<ABS_PATH>` | エージェントの workspace 等の絶対パス | `~/agents` を展開した絶対パス |
+| `<HOME>` | ホームディレクトリ | `echo $HOME` の値 |
+| `<ENCODED_LEAD_CWD>` | `~/.claude/projects/` 配下の、リードエージェントの cwd を符号化したフォルダ名 | `ls ~/.claude/projects/` で確認 |
+| `<TAILSCALE_IP>` / `<TAILSCALE_HOSTNAME>` | 別端末から見る場合のアクセス元（不要なら削除可） | `100.x.y.z` |
+
+> **手元のブラウザだけで見るなら** `serverOnly.host` は `127.0.0.1`、`allowedHosts` は `["127.0.0.1","localhost"]` のままでよい。
+> **別の PC やスマホから見るなら**（例: Tailscale 経由）`host` を `0.0.0.0` にし、`allowedHosts` にアクセスに使うホスト名／IP を**必ず追加**する（未追加だと 403 で弾く安全側の挙動）。`serverOnly.dataSources` を設定しない API は空配列を返すだけで、最小構成でもダッシュボードは起動する。
 
 ### 触って試す（デモ）
 

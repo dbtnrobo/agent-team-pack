@@ -265,9 +265,13 @@ async function loadSkills(){
 }
 async function loadAgents(){
   const d=await jget('/api/agents'); if(!d) return;
-  const rows=d.panes.filter(p=>/claude/i.test(p.command)).map(p=>
-    '<div class="row"><div style="flex:1"><strong>'+esc(p.title)+'</strong><div class="muted" style="font-size:12px">'+esc(p.window)+'</div></div><span class="status-pill run">稼働中</span></div>'
-  ).join('');
+  const rows=d.panes.filter(p=>/claude/i.test(p.command)).map(p=>{
+    // label は cwd から確定したエージェント名（Claude が pane title を上書きするため title は当てにならない）。
+    // label が無いペインのみ title にフォールバック。title は現在の作業内容として補助表示。
+    const name=esc(p.label||p.title||'(unknown)');
+    const sub=p.label?esc(p.title):esc(p.window);
+    return '<div class="row"><div style="flex:1"><strong>'+name+'</strong><div class="muted" style="font-size:12px">'+sub+'</div></div><span class="status-pill run">稼働中</span></div>';
+  }).join('');
   renderInto('agents','.panel', rows+'<div class="muted" style="font-size:11px;margin-top:10px">※ agmsg最新メッセージ・操作ボタンは準備中（連携層／queue分離の実装後に接続）</div>');
 }
 async function loadDocs(){

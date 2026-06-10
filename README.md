@@ -119,8 +119,14 @@ bash scripts/manage_sessions.sh restore <sessionId>
 ## テスト
 
 ```bash
+# 記憶層（Python・pytest）
 python3 -m pytest memory_system/tests/ -q
+
+# ダッシュボード（Node 標準の node:test・追加依存なし）
+cd dashboard && npm test
 ```
+
+ダッシュボードは `dashboard/lib/` の各モジュール（純粋関数・データソース読み取り・セッション操作・API ルーティング）を単体テストし、サーバーを実起動して全 API を叩く統合テスト（アーカイブ往復・method/host ガード含む）まで備える。`node:test` 組み込みのみで外部依存ゼロ。
 
 ## ライセンス / 流用元
 

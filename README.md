@@ -49,11 +49,13 @@ cp config.example.json config.json   # <...> プレースホルダを自分の�
 node server.js                        # http://127.0.0.1:8080
 ```
 
-**B. フル導入（Claude Code プラグイン＝記憶フック＋ダッシュボード監視も入れる）**
+**B. フル導入（Claude Code プラグイン＝自動想起＋記憶スキル＋ダッシュボード監視）**
 ```bash
 git clone https://github.com/dbtnrobo/agent-team-pack.git && cd agent-team-pack
-bash install.sh                       # 依存チェック → marketplace 登録 → plugin 導入
+bash install.sh "チーム名"            # 依存チェック → plugin 導入 → config.json 自動生成
 ```
+`install.sh` が `dashboard/config.json` をあなたの環境値（HOME・記憶ディレクトリの自動検出）で
+生成するので、B 経路はプレースホルダの手作業なしでそのまま動く。やめるときは `bash uninstall.sh`。
 
 > **会社／他人の PC で使っても安全**: 環境固有の値（パス・ホスト・チーム名・起動コマンド）は
 > すべて `dashboard/config.json` に隔離され、これは `.gitignore` 済みでリポジトリに入らない。
@@ -82,11 +84,28 @@ git clone <this-repo> && cd agent-team-pack
 bash install.sh         # 依存チェック → marketplace 登録 → plugin 導入
 ```
 
-`install.sh` は `claude plugin marketplace add .` と `claude plugin install agent-team-pack@doubutuen-agent-tools` を行う。
-プラグインは以下を提供する：
+`install.sh` は `claude plugin marketplace add .` と `claude plugin install agent-team-pack@doubutuen-agent-tools` に加え、
+`dashboard/config.json` の自動生成と `tasks/` の作成を行う。プラグインは以下を提供する：
 
-- **hooks**（`hooks/hooks.json`）: SessionStart/Stop で記憶を再索引＋CONTEXT ローテ（LLM非依存）。設定は環境変数 `MEMORY_DIRS` / `MEMORY_CONTEXT`（任意・未設定なら `~/.claude`）。
+- **自動想起（hooks）**: SessionStart で記憶を再索引した上で、**直近の作業文脈（CONTEXT.md の最新ブロック）と記憶の目次をセッションに自動注入**する。LLM 非依存（フックの stdout 注入を利用）。Stop で CONTEXT ローテ＋再索引。
+- **記憶スキル**: `recall`（FTS5 検索で想起・記憶に無ければ transcript を grep）/ `remember`（保存。重複拒否・字数上限・絶対日付を CLI が強制）/ `memory-gc`（棚卸し。重複・陳腐化候補をツールが列挙し、統合だけセッション内で行う）。
 - **monitor**（experimental）: 監視ダッシュボードを背景プロセスで起動。既に tmux 等で `:8080` を起動している場合は `claude plugin disable agent-team-pack` で競合回避。
+
+記憶ディレクトリの指定は `/plugin configure agent-team-pack`（GUI）か環境変数で（下の一覧参照）。
+
+### 環境変数一覧（すべて任意）
+
+| 変数 | 既定 | 意味 |
+|---|---|---|
+| `MEMORY_DIRS` | userConfig → `~/.claude` | 記憶 md のディレクトリ（os.pathsep 区切り） |
+| `MEMORY_CONTEXT` | 記憶ディレクトリ直下を探索 | CONTEXT.md のパス（Stop でローテ・SessionStart で注入） |
+| `MEMORY_KEEP_N` | `5` | ローテで残す先頭ブロック数 |
+| `MEMORY_INDEX_DB` | `CLAUDE_PLUGIN_DATA` 配下 | 索引 DB の場所（md から再構築可能な影） |
+| `MEMORY_INJECT` | `1` | `0` で自動注入を停止（再索引のみ） |
+| `MEMORY_INJECT_MAX_CHARS` | `4000` | 自動注入の上限字数（記憶が増えても注入量は一定） |
+| `MEMORY_INJECT_BLOCKS` | `1` | CONTEXT.md から注入する先頭ブロック数 |
+| `MEMORY_FILE_MAX_CHARS` | `10000` | 記憶 md 1ファイルの上限。超過時は保存を拒否し統合を強制 |
+| `DASHBOARD_CONFIG` | `dashboard/config.json` | ダッシュボード設定ファイルの場所 |
 
 ## 公開前チェック
 
@@ -104,20 +123,36 @@ CLI エージェントに永続記憶を与える軽量ライブラリ。**LLM �
 
 - **真実の源は Markdown**。SQLite + FTS5 は md から再構築可能な検索インデックス（影）。
 - **日本語対応**: FTS5 trigram トークナイザ ＋ 2文字以下は LIKE フォールバック。
-- **差分再索引**: SHA-256 ハッシュで変更チャンクだけ更新、消えた節は索引からも削除。
+- **差分再索引**: SHA-256 ハッシュで変更チャンクだけ更新、消えた節・消えたファイルは索引からも削除。
 - **CONTEXT.md ローテーション**: 先頭（新しい）N ブロックを残し、古いブロックをアーカイブへ退避（肥大防止）。
-- 依存は Python 標準 `sqlite3` のみ（FTS5 が有効な SQLite が必要）。
+- **検索結果に日付つき**: 見出しの日付（無ければ mtime）を返し、記憶の新旧を判断できる。
+- 依存は Python 標準 `sqlite3` のみ（FTS5 が有効な SQLite が必要）。macOS / Linux 対応。
 
 ```bash
 export MEMORY_DIRS="$HOME/.claude/memory:/path/to/workspace/memory"
 
 python3 memory_system/index_memory.py reindex          # md を索引（差分のみ）
 python3 memory_system/index_memory.py search "クエリ"    # 記憶を想起（日本語OK）
-python3 memory_system/index_memory.py search "クエリ" --json   # ダッシュボード等から使う JSON 出力
+python3 memory_system/index_memory.py search "クエリ" --json   # JSON出力（date フィールド付き）
 python3 memory_system/rotate_context.py path/to/CONTEXT.md -n 5 # 先頭5ブロックを残す
+
+# 保存（remember スキルの書き込み経路。重複拒否・上限・絶対日付を強制）
+python3 memory_system/memory_write.py append --file mem.md --heading "2026-06-11 決定: X" --body "..."
+python3 memory_system/memory_write.py replace --file mem.md --match "決定: X" --heading "..." --body "..."
+
+# 棚卸し（90日以上未更新・重複候補・肥大ファイルを列挙。read-only）
+python3 memory_system/memory_report.py --stale-days 90
 ```
 
-Stop フック統合（任意）: セッション終了時に「ローテ＋再索引」を自動実行する。**フックは LLM を呼ばない**こと（要約等が必要なら常駐エージェント本体が pull 型で行う）。
+### 記憶が増えても「ばかにならない」ための設計
+
+| 経路 | 対策 |
+|---|---|
+| 注入過多 | 自動注入は**目次方式**（ヘッダ＋CONTEXT最新ブロック＋ファイル名一覧、上限4000字）。記憶の総量と注入量が比例しない |
+| 保存過多 | remember は**保存前検索→既存があれば追記でなく更新**。完全重複は CLI が自動拒否。1ファイル上限超過時は統合を強制（error-driven consolidation） |
+| 経年劣化 | 検索結果の日付で新旧を判断。`memory-gc` スキル＋棚卸しレポートで重複・陳腐化を定期整理 |
+
+候補列挙・検索・保存はすべてローカルツール（課金ゼロ）。要約・統合などの LLM 作業はセッション内＝サブスク枠で行う。
 
 ## 監視ダッシュボード (dashboard/)
 
@@ -201,4 +236,4 @@ cd dashboard && npm test
 | ファイル | 流用元 | 内容 |
 |---|---|---|
 | `memory_system/vendored_chunker.py` | [zilliztech/memsearch](https://github.com/zilliztech/memsearch) (MIT) | md チャンク分割（無改変コピー） |
-| `memory_system/fts_index.py` | [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) (MIT) | FTS5 スキーマ（unicode61＋CJK trigram）と CJK 検索ルーティングを改変流用 |
+| `memory_system/fts_index.py` | [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) の `hermes_state.py` (MIT) | FTS5 スキーマ（unicode61＋CJK trigram）と CJK 検索ルーティングを改変流用 |

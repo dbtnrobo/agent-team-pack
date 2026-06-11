@@ -2,11 +2,17 @@
 
 const fs = require('fs');
 const fsp = fs.promises;
+const path = require('path');
 const { nowIso, json } = require('./util');
 const { sanitizePublicConfig } = require('./config');
 const { resolveAgentKey } = require('./titles');
 const { listTaskFiles, listMarkdownIn, listSkillsIn, tmuxPanes, memorySearch, logSearch } = require('./sources');
-const { UUID_RE, liveSessionSet, scanSessions, sessionSearch, moveSessionFile } = require('./sessions');
+const { UUID_RE, liveSessionSet, scanSessions, sessionSearch, moveSessionFile, readPins, togglePin } = require('./sessions');
+
+/** ピン留めサイドカー JSON の場所（config で上書き可・既定は dashboard 直下） */
+function pinsFilePath(config, baseDir) {
+  return config.serverOnly?.dataSources?.sessions?.pinsFile || path.join(baseDir, 'pins.json');
+}
 
 // 検索系エンドポイント共通の前処理: クエリを取り出し、空なら 400 を返す。
 function readQuery(url) {
@@ -85,14 +91,27 @@ const ROUTES = {
     return json(res, 200, { panes, generatedAt: nowIso() });
   },
 
-  '/api/sessions': async (_req, res, config) => {
+  '/api/sessions': async (_req, res, config, url, baseDir) => {
     try {
       const cfg = config.serverOnly?.dataSources?.sessions || {};
       const live = await liveSessionSet(cfg.liveRegistryDir);
-      const r = await scanSessions(cfg.projectsRoot, cfg.limit, live);
+      const pins = await readPins(pinsFilePath(config, baseDir));
+      const project = (url?.searchParams.get('project') || '').trim() || null;
+      const r = await scanSessions(cfg.projectsRoot, cfg.limit, live, { pins, project });
       return json(res, 200, { ...r, generatedAt: nowIso() });
     } catch (error) {
       return json(res, 500, { error: 'sessions_failed', message: error.message, generatedAt: nowIso() });
+    }
+  },
+
+  '/api/pin-session': async (_req, res, config, url, baseDir) => {
+    const id = (url.searchParams.get('id') || '').trim();
+    if (!UUID_RE.test(id)) return json(res, 400, { error: 'bad_id', generatedAt: nowIso() });
+    try {
+      const pinned = await togglePin(pinsFilePath(config, baseDir), id);
+      return json(res, 200, { ok: true, pinned, generatedAt: nowIso() });
+    } catch (error) {
+      return json(res, 500, { error: 'pin_failed', message: error.message, generatedAt: nowIso() });
     }
   },
 

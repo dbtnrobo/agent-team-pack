@@ -88,7 +88,7 @@ async function sessionHead(fp) {
 }
 
 /** transcript 1 件をダッシュボード表示用の行に整形する（タイトル/発話は 160 字に切る）。 */
-function toSessionRow({ sessionId, cwd, project, modifiedAt, sizeKB, live, first, title }) {
+function toSessionRow({ sessionId, cwd, project, modifiedAt, sizeKB, live, first, title, pinned }) {
   return {
     sessionId,
     cwd,
@@ -96,6 +96,7 @@ function toSessionRow({ sessionId, cwd, project, modifiedAt, sizeKB, live, first
     modifiedAt,
     sizeKB,
     live: !!live,
+    pinned: !!pinned,
     first: (first || '').slice(0, 160),
     title: (title || first || '').slice(0, 160),
     resumeCmd: (cwd ? `cd "${cwd}" && ` : '') + `claude --resume ${sessionId} --dangerously-skip-permissions`
@@ -125,23 +126,48 @@ async function liveSessionSet(liveRegistryDir) {
 }
 
 /**
+ * ピン留めの読み書き（サイドカー JSON。セッション実体には触れない）。
+ */
+async function readPins(pinsFile) {
+  try {
+    const d = JSON.parse(await fsp.readFile(pinsFile, 'utf8'));
+    return new Set(Array.isArray(d.pinned) ? d.pinned : []);
+  } catch (_e) { return new Set(); }
+}
+
+async function togglePin(pinsFile, id) {
+  const pins = await readPins(pinsFile);
+  const pinned = !pins.has(id);
+  if (pinned) pins.add(id); else pins.delete(id);
+  await fsp.mkdir(path.dirname(pinsFile), { recursive: true });
+  await fsp.writeFile(pinsFile, JSON.stringify({ pinned: [...pins].sort() }, null, 2) + '\n');
+  return pinned;
+}
+
+/**
  * <root>/<projectFolder>/*.jsonl を走査し、新しい順に最大 limit 件を整形して返す。
+ * ピン留めセッションは limit に関わらず必ず含め、先頭に出す。
  * @param {string} root projects ルート
  * @param {number} limit 最大件数
  * @param {Set<string>|null} live 稼働中 ID 集合（null なら live=false）
- * @returns {Promise<{sessions,total,liveCount,shown}>}
+ * @param {object} [opts] { pins: Set<string>, project: string|null（フォルダ名でフィルタ） }
+ * @returns {Promise<{sessions,total,liveCount,shown,projects}>}
  */
-async function scanSessions(root, limit, live) {
-  const empty = { sessions: [], total: 0, liveCount: 0, shown: 0 };
+async function scanSessions(root, limit, live, opts = {}) {
+  const pins = opts.pins || new Set();
+  const empty = { sessions: [], total: 0, liveCount: 0, shown: 0, projects: [] };
   if (!root) return empty;
   let projDirs = [];
   try { projDirs = (await fsp.readdir(root, { withFileTypes: true })).filter((d) => d.isDirectory()); } catch (_e) { return empty; }
 
   const entries = [];
+  const projects = [];
   for (const pd of projDirs) {
     const dir = path.join(root, pd.name);
     let files = [];
     try { files = (await fsp.readdir(dir)).filter((n) => n.endsWith('.jsonl')); } catch (_e) { continue; }
+    if (files.length) projects.push(pd.name);
+    if (opts.project && pd.name !== opts.project) continue;
     for (const name of files) {
       const fp = path.join(dir, name);
       let st;
@@ -150,18 +176,31 @@ async function scanSessions(root, limit, live) {
     }
   }
   entries.sort((a, b) => b.mtime - a.mtime);
-  const top = entries.slice(0, Number(limit) || 60);
+  const lim = Number(limit) || 60;
+  // ピン留めは limit から漏れても必ず表示する
+  const top = entries.filter((e) => pins.has(e.sessionId));
+  for (const e of entries) {
+    if (top.length >= lim + top.filter((t) => pins.has(t.sessionId)).length) break;
+    if (!pins.has(e.sessionId)) top.push(e);
+  }
+  top.sort((a, b) => {
+    const pa = pins.has(a.sessionId) ? 1 : 0;
+    const pb = pins.has(b.sessionId) ? 1 : 0;
+    if (pa !== pb) return pb - pa; // ピン留めを先頭に
+    return b.mtime - a.mtime;
+  });
 
   const sessions = [];
-  for (const e of top) {
+  for (const e of top.slice(0, lim + pins.size)) {
     const { cwd, first, title } = await sessionHead(e.fp);
     sessions.push(toSessionRow({
       sessionId: e.sessionId, cwd, project: e.project,
       modifiedAt: e.mtime.toISOString(), sizeKB: Math.round(e.size / 1024),
-      live: live ? live.has(e.sessionId) : false, first, title
+      live: live ? live.has(e.sessionId) : false, first, title,
+      pinned: pins.has(e.sessionId)
     }));
   }
-  return { sessions, total: entries.length, liveCount: live ? live.size : 0, shown: sessions.length };
+  return { sessions, total: entries.length, liveCount: live ? live.size : 0, shown: sessions.length, projects: projects.sort() };
 }
 
 /**
@@ -248,5 +287,6 @@ async function moveSessionFile(id, fromRoot, toRoot) {
 
 module.exports = {
   UUID_RE, sessionHead, toSessionRow, liveSessionSet,
-  scanSessions, sessionSearch, findSessionFile, moveSessionFile
+  scanSessions, sessionSearch, findSessionFile, moveSessionFile,
+  readPins, togglePin
 };

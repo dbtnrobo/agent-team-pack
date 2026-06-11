@@ -194,7 +194,12 @@ body{margin:0;background:linear-gradient(180deg,var(--bg-muted) 0%,var(--bg) 220
 
   <!-- ============ SESSIONS ============ -->
   <section class="view" data-view="sessions">
-    <div class="banner">resume できる会話の一覧（最近60件）。コマンドをコピーして貼れば続きから開けます。read-only・LLMは呼ばない。</div>
+    <div class="banner">resume できる会話の一覧（最近60件＋ピン留め）。📌 で常に先頭に固定。コマンドをコピーして貼れば続きから開けます。read-only・LLMは呼ばない。</div>
+    <div style="margin-bottom:10px">
+      <select id="projFilter" onchange="loadSessions()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border,#d1d5db)">
+        <option value="">全プロジェクト</option>
+      </select>
+    </div>
     <div id="sessList"><p class="muted">読み込み中…</p></div>
   </section>
 
@@ -320,19 +325,38 @@ async function postAction(path,id,btn){
 }
 function archiveSession(id,btn){ if(confirm('このセッションをアーカイブに退避しますか？\n'+id.slice(0,8)+'…\n（中身は不変・あとで復元可）')) postAction('/api/archive-session',id,btn); }
 function restoreSession(id,btn){ postAction('/api/restore-session',id,btn); }
+async function pinSession(id,btn){
+  btn.disabled=true;
+  try{
+    const r=await fetch('/api/pin-session?id='+encodeURIComponent(id),{method:'POST'});
+    const d=await r.json().catch(()=>({}));
+    if(r.ok&&d.ok){ loadSessions(); return; }
+    alert('失敗: '+((d&&(d.message||d.error))||r.status));
+  }catch(e){ alert('通信失敗'); }
+  btn.disabled=false;
+}
 async function loadSessions(){
-  const d=await jget('/api/sessions'); if(!d||!d.sessions){ renderInto('sessions','#sessList','<p class="muted">取得失敗</p>'); return; }
+  const sel=document.getElementById('projFilter');
+  const proj=sel?sel.value:'';
+  const d=await jget('/api/sessions'+(proj?'?project='+encodeURIComponent(proj):''));
+  if(!d||!d.sessions){ renderInto('sessions','#sessList',errHtml(apiErr(d)||'取得失敗')); return; }
+  // プロジェクトフィルタの選択肢を更新（選択は維持）
+  if(sel&&d.projects){
+    const cur=sel.value;
+    sel.innerHTML='<option value="">全プロジェクト</option>'+d.projects.map(p=>'<option value="'+esc(p)+'"'+(p===cur?' selected':'')+'>'+esc(p)+'</option>').join('');
+  }
   const summary='<div class="toolbar panel" style="margin-bottom:10px"><div><p class="eyebrow">Sessions</p><strong>全 '+(d.total||0)+' 件</strong></div>'
-    +'<div class="muted" style="font-size:12px">稼働中 '+(d.liveCount||0)+' ・ 一覧表示 '+(d.shown||d.sessions.length)+'（新しい順）</div></div>';
+    +'<div class="muted" style="font-size:12px">稼働中 '+(d.liveCount||0)+' ・ 一覧表示 '+(d.shown||d.sessions.length)+'（📌→新しい順）</div></div>';
   const html=summary+d.sessions.map(s=>{
-    const proj=(s.cwd||s.project||'').split('/').slice(-2).join('/');
+    const proj2=(s.cwd||s.project||'').split('/').slice(-2).join('/');
     const when=(s.modifiedAt||'').replace('T',' ').slice(5,16);
     const cmd=esc(s.resumeCmd);
-    return '<div class="item panel" style="margin-bottom:8px">'
+    return '<div class="item panel" style="margin-bottom:8px'+(s.pinned?';border-left:3px solid var(--accent,#3b82f6)':'')+'">'
       +'<div class="row"><span class="chip '+(s.live?'p-high':'')+'">'+(s.live?'稼働中':'過去')+'</span>'
-      +'<div style="flex:1"><strong>'+esc(s.title||s.first||'(発話なし)')+'</strong>'
-      +'<div class="muted" style="font-size:11px">'+esc(proj)+' ・ '+esc(when)+' ・ '+s.sizeKB+'KB ・ '+esc(s.sessionId.slice(0,8))+'…</div></div></div>'
+      +'<div style="flex:1"><strong>'+(s.pinned?'📌 ':'')+esc(s.title||s.first||'(発話なし)')+'</strong>'
+      +'<div class="muted" style="font-size:11px">'+esc(proj2)+' ・ '+esc(when)+' ・ '+s.sizeKB+'KB ・ '+esc(s.sessionId.slice(0,8))+'…</div></div></div>'
       +'<div class="row" style="margin-top:6px"><code style="flex:1;font-size:11px;overflow:auto;white-space:nowrap;background:#f3f4f6;padding:6px;border-radius:6px">'+cmd+'</code>'
+      +'<button class="btn" title="'+(s.pinned?'ピンを外す':'ピン留め（常に先頭）')+'" onclick="pinSession(\''+s.sessionId+'\',this)">'+(s.pinned?'📌✓':'📌')+'</button>'
       +'<button class="btn" data-cmd="'+cmd+'" onclick="copyText(this,this.dataset.cmd)">コピー</button>'
       +(s.live?'':'<button class="btn" onclick="archiveSession(\''+s.sessionId+'\',this)">📦 アーカイブ</button>')
       +'</div></div>';

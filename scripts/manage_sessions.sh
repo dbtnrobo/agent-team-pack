@@ -15,9 +15,20 @@ live_ids() {
     [ -f "$f" ] || continue
     python3 - "$f" <<'PY'
 import json, os, sys
+
+def alive(pid):
+    # kill(pid, 0) はシグナルを送らず生存確認のみ（macOS/Linux両対応）
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+
 try:
     d = json.load(open(sys.argv[1])); pid, sid = d.get("pid"), d.get("sessionId")
-    if pid and sid and os.path.exists(f"/proc/{pid}"):
+    if pid and sid and alive(int(pid)):
         print(sid)
 except Exception:
     pass
@@ -46,7 +57,9 @@ move_one() { # src を <destRoot>/<元フォルダ名>/ へ
 
 case "${1:-}" in
   archive-all)
-    mapfile -t LIVE < <(live_ids)
+    # mapfile は bash 4+ のため、macOS 標準 bash 3.2 でも動く while-read で読む
+    LIVE=()
+    while IFS= read -r l; do [ -n "$l" ] && LIVE+=("$l"); done < <(live_ids)
     moved=0
     for d in "$PROJ_ROOT"/*/; do
       [ -d "$d" ] || continue

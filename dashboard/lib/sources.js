@@ -94,13 +94,16 @@ async function listSkillsIn(skillsDir) {
 }
 
 /**
- * tmux の "agents" セッションのペイン稼働状況を取得する。tmux が無ければ空配列。
+ * tmux セッションのペイン稼働状況を取得する。tmux が無ければ空配列。
+ * セッション名は config.serverOnly.tmuxSession（既定 "agents"）。
+ * @param {object} [config]
  * @returns {Promise<Array<{window,title,command,path}>>}
  */
-function tmuxPanes() {
+function tmuxPanes(config) {
+  const session = config?.serverOnly?.tmuxSession || 'agents';
   return new Promise((resolve) => {
     execFile('tmux',
-      ['list-panes', '-s', '-t', 'agents', '-F', '#{window_name}|||#{pane_title}|||#{pane_current_command}|||#{pane_current_path}'],
+      ['list-panes', '-s', '-t', session, '-F', '#{window_name}|||#{pane_title}|||#{pane_current_command}|||#{pane_current_path}'],
       { timeout: 3000 },
       (err, stdout) => {
         if (err || !stdout) return resolve([]);

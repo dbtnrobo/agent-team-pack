@@ -77,7 +77,7 @@ const ROUTES = {
   '/api/agents': async (_req, res, config) => {
     const agentDefs = config.agents || {};
     const keys = Object.keys(agentDefs);
-    const panes = (await tmuxPanes()).map((p) => {
+    const panes = (await tmuxPanes(config)).map((p) => {
       const agentKey = resolveAgentKey(p.path, keys);
       const def = agentKey ? agentDefs[agentKey] : null;
       return { ...p, agentKey, label: def?.label || agentKey || null, color: def?.color || null };

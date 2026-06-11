@@ -69,11 +69,26 @@ is_lock_fresh() {
   [[ $age -lt $LOCK_TTL_SEC ]]
 }
 
+# プロセスのコマンドラインを取得（/proc 非依存・macOS/Linux 両対応）
+pid_cmdline() {
+  ps -o command= -p "$1" 2>/dev/null || ps -o args= -p "$1" 2>/dev/null || true
+}
+
+# プロセスの cwd を取得。Linux は /proc、macOS は lsof で引く
+pid_cwd() {
+  local pid="$1"
+  if [[ -e "/proc/${pid}/cwd" ]]; then
+    readlink "/proc/${pid}/cwd" 2>/dev/null || true
+  else
+    lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n1
+  fi
+}
+
 pid_or_descendant_is_claude() {
   local pid="$1"
-  [[ -n "$pid" && -d "/proc/${pid}" ]] || return 1
+  [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null || return 1
   local cmdline
-  cmdline="$(tr '\0' ' ' < "/proc/${pid}/cmdline" 2>/dev/null || true)"
+  cmdline="$(pid_cmdline "$pid")"
   if [[ "$cmdline" == *claude* ]]; then
     return 0
   fi
@@ -103,18 +118,16 @@ is_agent_running() {
   fi
 
   local workspace_real
-  workspace_real="$(readlink -f "$workspace" 2>/dev/null || printf '%s' "$workspace")"
+  # readlink -f は macOS の旧 readlink に無いため cd && pwd -P で実体パス化
+  workspace_real="$(cd "$workspace" 2>/dev/null && pwd -P || printf '%s' "$workspace")"
   [[ -n "$workspace_real" ]] || return 1
 
-  local proc_dir cwd_link cmdline
-  for proc_dir in /proc/[0-9]*; do
-    [[ -d "$proc_dir" ]] || continue
-    cwd_link="$(readlink "${proc_dir}/cwd" 2>/dev/null || true)"
-    [[ "$cwd_link" == "$workspace_real" ]] || continue
-    cmdline="$(tr '\0' ' ' < "${proc_dir}/cmdline" 2>/dev/null || true)"
-    if [[ "$cmdline" == *claude* ]]; then
-      return 0
-    fi
+  # claude を含むプロセスを列挙し、cwd が workspace のものを探す（/proc 全走査の代替）
+  local pid cwd
+  for pid in $(pgrep -f claude 2>/dev/null || true); do
+    cwd="$(pid_cwd "$pid")"
+    [[ "$cwd" == "$workspace_real" ]] || continue
+    return 0
   done
   return 1
 }

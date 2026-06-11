@@ -92,3 +92,18 @@ def test_short_japanese_recall(tmp_path):
     md.write_text("# 寿司\n寿司は酢飯に魚介をのせた日本料理。\n", encoding="utf-8")
     index_markdown_file(db, md)
     assert any("酢飯" in h["content"] for h in search(db, "寿司"))
+
+
+def test_deleted_file_is_pruned_from_index(tmp_path):
+    """mdファイルごと削除されたら、reindexで索引からも消える。"""
+    import index_memory
+
+    md = tmp_path / "gone.md"
+    md.write_text("# 一時メモ\nフラミンゴは片足で立つ鳥。\n", encoding="utf-8")
+    db = connect()
+    index_memory.reindex(db, tmp_path)
+    assert search(db, "フラミンゴ")  # 最初はヒット
+
+    md.unlink()  # ファイルごと削除
+    index_memory.reindex(db, tmp_path)
+    assert search(db, "フラミンゴ") == []  # 索引からも消えている

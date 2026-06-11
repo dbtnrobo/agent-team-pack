@@ -105,6 +105,23 @@ def index_markdown_file(db: sqlite3.Connection, path) -> int:
     return added
 
 
+def prune_missing_sources(db: sqlite3.Connection) -> int:
+    """実体ファイルが消えた source のチャンクを索引から削除する。戻り値: 削除チャンク数。
+
+    mdをセクション単位で消した場合は index_markdown_file の差分同期が拾うが、
+    ファイルごと削除した場合はそのファイルが再走査されないため、ここで掃除する。
+    """
+    removed = 0
+    sources = [r[0] for r in db.execute("SELECT DISTINCT source FROM chunks")]
+    for src in sources:
+        if not Path(src).exists():
+            cur = db.execute("DELETE FROM chunks WHERE source = ?", (src,))
+            removed += cur.rowcount
+    if removed:
+        db.commit()
+    return removed
+
+
 def _fts_match(db, table, query, limit):
     rows = db.execute(
         f"SELECT c.source, c.heading, c.content"

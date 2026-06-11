@@ -23,7 +23,7 @@
     "memory_dirs": {
       "type": "string",
       "title": "記憶ディレクトリ",
-      "description": "記憶md(.md)があるディレクトリ。os.pathsep区切り。未設定なら ~/.claude を索引。環境変数 MEMORY_DIRS でも指定可。"
+      "description": "記憶md(.md)があるディレクトリ。os.pathsep区切り。フック（自動再索引・自動想起）とスキル（recall/remember/memory-gc）に自動配線される。環境変数 MEMORY_DIRS が設定されていればそちらが優先。未設定なら ~/.claude を索引。"
     }
   }
 }

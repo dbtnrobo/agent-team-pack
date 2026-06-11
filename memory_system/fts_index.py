@@ -15,7 +15,9 @@
 * チャンク分割: vendored_chunker.py（memsearch 無改変コピー）
 """
 
+import re
 import sqlite3
+from datetime import date
 from pathlib import Path
 
 from vendored_chunker import chunk_markdown
@@ -72,6 +74,28 @@ def _as_phrase(query: str) -> str:
     return '"' + query.replace('"', '""') + '"'
 
 
+_DATE_RE = re.compile(r"(\d{4})[-/年.](\d{1,2})[-/月.](\d{1,2})")
+
+
+def _chunk_date(source: str, heading: str) -> str:
+    """チャンクの日付を推定して ISO 形式 (YYYY-MM-DD) で返す。
+
+    見出しに日付（2026-06-11 / 2026/6/11 / 2026年6月11日 等）があればそれを、
+    無ければファイルの最終更新日時を使う。想起時に記憶の新旧を判断する材料。
+    """
+    m = _DATE_RE.search(heading or "")
+    if m:
+        y, mo, d = (int(g) for g in m.groups())
+        try:
+            return date(y, mo, d).isoformat()
+        except ValueError:
+            pass
+    try:
+        return date.fromtimestamp(Path(source).stat().st_mtime).isoformat()
+    except OSError:
+        return ""
+
+
 def index_markdown_file(db: sqlite3.Connection, path) -> int:
     """md を chunk 化し、変更分だけ索引を更新する（差分同期）。
 
@@ -122,6 +146,13 @@ def prune_missing_sources(db: sqlite3.Connection) -> int:
     return removed
 
 
+def _rows_to_hits(rows):
+    return [
+        {"source": r[0], "heading": r[1], "content": r[2], "date": _chunk_date(r[0], r[1])}
+        for r in rows
+    ]
+
+
 def _fts_match(db, table, query, limit):
     rows = db.execute(
         f"SELECT c.source, c.heading, c.content"
@@ -129,7 +160,7 @@ def _fts_match(db, table, query, limit):
         f" WHERE {table} MATCH ? ORDER BY rank LIMIT ?",
         (_as_phrase(query), limit),
     ).fetchall()
-    return [{"source": r[0], "heading": r[1], "content": r[2]} for r in rows]
+    return _rows_to_hits(rows)
 
 
 def _like_search(db, query, limit):
@@ -138,7 +169,7 @@ def _like_search(db, query, limit):
         "SELECT source, heading, content FROM chunks WHERE content LIKE ? LIMIT ?",
         (f"%{query}%", limit),
     ).fetchall()
-    return [{"source": r[0], "heading": r[1], "content": r[2]} for r in rows]
+    return _rows_to_hits(rows)
 
 
 def search(db: sqlite3.Connection, query: str, limit: int = 10) -> list[dict]:

@@ -23,6 +23,8 @@ dashboard/config.json
 dashboard/*.log
 dashboard/.heartbeat*
 dashboard/heartbeat.cron.log
+dashboard/pins.json
+tasks/
 
 # 公開前ガードの組織固有パターン（自社の固有名/IP）
 scripts/secret_patterns.local

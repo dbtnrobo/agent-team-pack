@@ -7,7 +7,7 @@
       "name": "agent-team-pack",
       "source": ".",
       "description": "永続記憶＋監視ダッシュボード＋セッション管理。サブスク枠内・追加課金ゼロ。",
-      "version": "0.1.0"
+      "version": "0.2.1"
     }
   ]
 }

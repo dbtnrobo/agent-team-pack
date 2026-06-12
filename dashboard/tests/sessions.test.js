@@ -115,10 +115,11 @@ test('toSessionRow: cwd 無しは cd を付けない', () => {
 });
 
 test('scanSessions: root 無し / 空は空結果', async () => {
-  assert.deepEqual(await scanSessions(null, 10, null), { sessions: [], total: 0, liveCount: 0, shown: 0 });
+  const empty = { sessions: [], total: 0, liveCount: 0, shown: 0, projects: [] };
+  assert.deepEqual(await scanSessions(null, 10, null), empty);
   const emptyRoot = path.join(TMP, 'empty-root');
   await fsp.mkdir(emptyRoot, { recursive: true });
-  assert.deepEqual(await scanSessions(emptyRoot, 10, null), { sessions: [], total: 0, liveCount: 0, shown: 0 });
+  assert.deepEqual(await scanSessions(emptyRoot, 10, null), empty);
 });
 
 test('scanSessions: project フォルダ配下の jsonl を新しい順・limit で返す', async () => {

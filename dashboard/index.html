@@ -194,7 +194,12 @@ body{margin:0;background:linear-gradient(180deg,var(--bg-muted) 0%,var(--bg) 220
 
   <!-- ============ SESSIONS ============ -->
   <section class="view" data-view="sessions">
-    <div class="banner">resume できる会話の一覧（最近60件）。コマンドをコピーして貼れば続きから開けます。read-only・LLMは呼ばない。</div>
+    <div class="banner">resume できる会話の一覧（最近60件＋ピン留め）。📌 で常に先頭に固定。コマンドをコピーして貼れば続きから開けます。read-only・LLMは呼ばない。</div>
+    <div style="margin-bottom:10px">
+      <select id="projFilter" onchange="loadSessions()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border,#d1d5db)">
+        <option value="">全プロジェクト</option>
+      </select>
+    </div>
     <div id="sessList"><p class="muted">読み込み中…</p></div>
   </section>
 
@@ -237,6 +242,9 @@ document.querySelectorAll('.tab').forEach(t=>{
 });
 
 async function jget(p){ try{ const r=await fetch(p,{cache:'no-store'}); return await r.json(); }catch(e){ return null; } }
+// API失敗（通信エラー or {error} 応答）を判定し、表示用メッセージを返す
+function apiErr(d){ if(!d) return 'サーバーに接続できません'; if(d.error) return esc(d.message||d.error); return null; }
+function errHtml(msg){ return '<p class="muted">⚠ 読み込み失敗: '+msg+'</p>'; }
 function renderInto(view,sel,html){ const el=document.querySelector('.view[data-view="'+view+'"] '+sel); if(el) el.innerHTML=html; }
 function esc(s){ return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function fm(content,key){ const m=(content||'').match(new RegExp('^'+key+':\\s*(.+)$','m')); return m?m[1].trim():''; }
@@ -248,7 +256,8 @@ function findProjectSessions(kw){
   doSearch('session');
 }
 async function loadProjects(){
-  const d=await jget('/api/projects'); if(!d) return;
+  const d=await jget('/api/projects');
+  const e=apiErr(d); if(e){ renderInto('project','.grid2',errHtml(e)); return; }
   renderInto('project','.grid2', d.files.map(f=>{
     const name=f.name.replace('project_','').replace('.md','');
     const desc=fm(f.content,'description');
@@ -260,11 +269,13 @@ async function loadProjects(){
   }).join('') || '<p class="muted">プロジェクトなし</p>');
 }
 async function loadSkills(){
-  const d=await jget('/api/skills'); if(!d) return;
-  renderInto('skills','.grid2', d.skills.map(s=>'<div class="item panel"><h4>'+esc(s.name)+'</h4><p>'+esc(fm(s.content,'description').slice(0,140))+'</p></div>').join(''));
+  const d=await jget('/api/skills');
+  const e=apiErr(d); if(e){ renderInto('skills','.grid2',errHtml(e)); return; }
+  renderInto('skills','.grid2', d.skills.map(s=>'<div class="item panel"><h4>'+esc(s.name)+'</h4><p>'+esc(fm(s.content,'description').slice(0,140))+'</p></div>').join('') || '<p class="muted">skillなし</p>');
 }
 async function loadAgents(){
-  const d=await jget('/api/agents'); if(!d) return;
+  const d=await jget('/api/agents');
+  const e=apiErr(d); if(e){ renderInto('agents','.panel',errHtml(e)); return; }
   const rows=d.panes.filter(p=>/claude/i.test(p.command)).map(p=>{
     // label は cwd から確定したエージェント名（Claude が pane title を上書きするため title は当てにならない）。
     // label が無いペインのみ title にフォールバック。title は現在の作業内容として補助表示。
@@ -275,12 +286,18 @@ async function loadAgents(){
   renderInto('agents','.panel', rows+'<div class="muted" style="font-size:11px;margin-top:10px">※ agmsg最新メッセージ・操作ボタンは準備中（連携層／queue分離の実装後に接続）</div>');
 }
 async function loadDocs(){
-  const d=await jget('/api/docs'); if(!d) return;
+  const d=await jget('/api/docs');
+  const e=apiErr(d); if(e){ renderInto('rules','.panel',errHtml(e)); return; }
   renderInto('rules','.panel', d.docs.map(x=>'<div class="doc-link" data-path="'+esc(x.path)+'" data-label="'+esc(x.label)+'" onclick="showDoc(this)"><span>📜 '+esc(x.label)+'</span><span class="arrow">→</span></div>').join(''));
 }
 async function showDoc(el){ const d=await jget('/api/docs?path='+encodeURIComponent(el.dataset.path)); if(d&&d.content) alert(el.dataset.label+'\n\n'+d.content.slice(0,3000)); }
 async function loadTasks(){
-  const d=await jget('/api/tasks'); if(!d) return;
+  const d=await jget('/api/tasks');
+  const e=apiErr(d);
+  if(e){
+    document.querySelectorAll('.view[data-view="task"] .kanban .col').forEach(c=>{ c.innerHTML=errHtml(e); });
+    return;
+  }
   const tasks=d.files.map(f=>({title:fm(f.content,'title'),status:fm(f.content,'status'),assigned:fm(f.content,'assigned_to'),priority:fm(f.content,'priority')}));
   const g={pending:[],in_progress:[],completed:[]}; tasks.forEach(t=>{ if(g[t.status]) g[t.status].push(t); });
   const card=t=>'<div class="card"><div class="top"><span class="chip '+esc(t.assigned||'')+'">'+esc(t.assigned||'-')+'</span><span class="chip p-'+({high:'high',medium:'med',low:'low'}[t.priority]||'low')+'">'+esc(t.priority||'-')+'</span></div><div class="title">'+esc(t.title)+'</div></div>';
@@ -308,19 +325,38 @@ async function postAction(path,id,btn){
 }
 function archiveSession(id,btn){ if(confirm('このセッションをアーカイブに退避しますか？\n'+id.slice(0,8)+'…\n（中身は不変・あとで復元可）')) postAction('/api/archive-session',id,btn); }
 function restoreSession(id,btn){ postAction('/api/restore-session',id,btn); }
+async function pinSession(id,btn){
+  btn.disabled=true;
+  try{
+    const r=await fetch('/api/pin-session?id='+encodeURIComponent(id),{method:'POST'});
+    const d=await r.json().catch(()=>({}));
+    if(r.ok&&d.ok){ loadSessions(); return; }
+    alert('失敗: '+((d&&(d.message||d.error))||r.status));
+  }catch(e){ alert('通信失敗'); }
+  btn.disabled=false;
+}
 async function loadSessions(){
-  const d=await jget('/api/sessions'); if(!d||!d.sessions){ renderInto('sessions','#sessList','<p class="muted">取得失敗</p>'); return; }
+  const sel=document.getElementById('projFilter');
+  const proj=sel?sel.value:'';
+  const d=await jget('/api/sessions'+(proj?'?project='+encodeURIComponent(proj):''));
+  if(!d||!d.sessions){ renderInto('sessions','#sessList',errHtml(apiErr(d)||'取得失敗')); return; }
+  // プロジェクトフィルタの選択肢を更新（選択は維持）
+  if(sel&&d.projects){
+    const cur=sel.value;
+    sel.innerHTML='<option value="">全プロジェクト</option>'+d.projects.map(p=>'<option value="'+esc(p)+'"'+(p===cur?' selected':'')+'>'+esc(p)+'</option>').join('');
+  }
   const summary='<div class="toolbar panel" style="margin-bottom:10px"><div><p class="eyebrow">Sessions</p><strong>全 '+(d.total||0)+' 件</strong></div>'
-    +'<div class="muted" style="font-size:12px">稼働中 '+(d.liveCount||0)+' ・ 一覧表示 '+(d.shown||d.sessions.length)+'（新しい順）</div></div>';
+    +'<div class="muted" style="font-size:12px">稼働中 '+(d.liveCount||0)+' ・ 一覧表示 '+(d.shown||d.sessions.length)+'（📌→新しい順）</div></div>';
   const html=summary+d.sessions.map(s=>{
-    const proj=(s.cwd||s.project||'').split('/').slice(-2).join('/');
+    const proj2=(s.cwd||s.project||'').split('/').slice(-2).join('/');
     const when=(s.modifiedAt||'').replace('T',' ').slice(5,16);
     const cmd=esc(s.resumeCmd);
-    return '<div class="item panel" style="margin-bottom:8px">'
+    return '<div class="item panel" style="margin-bottom:8px'+(s.pinned?';border-left:3px solid var(--accent,#3b82f6)':'')+'">'
       +'<div class="row"><span class="chip '+(s.live?'p-high':'')+'">'+(s.live?'稼働中':'過去')+'</span>'
-      +'<div style="flex:1"><strong>'+esc(s.title||s.first||'(発話なし)')+'</strong>'
-      +'<div class="muted" style="font-size:11px">'+esc(proj)+' ・ '+esc(when)+' ・ '+s.sizeKB+'KB ・ '+esc(s.sessionId.slice(0,8))+'…</div></div></div>'
+      +'<div style="flex:1"><strong>'+(s.pinned?'📌 ':'')+esc(s.title||s.first||'(発話なし)')+'</strong>'
+      +'<div class="muted" style="font-size:11px">'+esc(proj2)+' ・ '+esc(when)+' ・ '+s.sizeKB+'KB ・ '+esc(s.sessionId.slice(0,8))+'…</div></div></div>'
       +'<div class="row" style="margin-top:6px"><code style="flex:1;font-size:11px;overflow:auto;white-space:nowrap;background:#f3f4f6;padding:6px;border-radius:6px">'+cmd+'</code>'
+      +'<button class="btn" title="'+(s.pinned?'ピンを外す':'ピン留め（常に先頭）')+'" onclick="pinSession(\''+s.sessionId+'\',this)">'+(s.pinned?'📌✓':'📌')+'</button>'
       +'<button class="btn" data-cmd="'+cmd+'" onclick="copyText(this,this.dataset.cmd)">コピー</button>'
       +(s.live?'':'<button class="btn" onclick="archiveSession(\''+s.sessionId+'\',this)">📦 アーカイブ</button>')
       +'</div></div>';
@@ -380,7 +416,12 @@ async function loadArchive(){
 }
 
 loadProjects(); loadSkills(); loadAgents(); loadDocs(); loadTasks(); loadSessions(); loadArchive();
-setInterval(()=>{ loadTasks(); loadAgents(); loadSessions(); }, 30000);
+// ポーリング間隔は config.polling.taskIntervalSec（秒）。取得失敗時は30秒
+(async()=>{
+  const c=await jget('/api/config');
+  const sec=(c&&c.polling&&Number(c.polling.taskIntervalSec))||30;
+  setInterval(()=>{ loadTasks(); loadAgents(); loadSessions(); }, Math.max(5,sec)*1000);
+})();
 </script>
 </body>
 </html>

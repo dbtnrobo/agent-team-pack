@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from fts_index import connect, index_markdown_file
+from fts_index import connect, index_markdown_file, prune_missing_sources
 from fts_index import search as fts_search
 
 # 索引対象の記憶ディレクトリは環境変数 MEMORY_DIRS（os.pathsep 区切り）で指定する。
@@ -47,6 +47,7 @@ def reindex(db, dirs=None) -> tuple[int, int]:
         for md in sorted(Path(d).glob("*.md")):
             added += index_markdown_file(db, md)
             files += 1
+    prune_missing_sources(db)
     return files, added
 
 
@@ -81,8 +82,9 @@ def main() -> None:
         # Stopフックはクラッシュ時に発火しないため、索引の鮮度は検索時に担保する。
         try:
             reindex(db)
-        except Exception:
-            pass
+        except Exception as e:
+            # 検索自体は古い索引で続行できるため落とさないが、無言にはしない
+            print(f"warning: reindex failed, results may be stale: {e}", file=sys.stderr)
         hits = fts_search(db, args.query, args.n)
         if args.json:
             import json as _json

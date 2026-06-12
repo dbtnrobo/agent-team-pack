@@ -20,7 +20,7 @@ const PUBLIC_FILES = new Map([
 ]);
 
 // LLM 非依存・純ファイル移動なので POST を許可する例外パス。それ以外は read-only(GET/HEAD)。
-const MUTATING_PATHS = ['/api/archive-session', '/api/restore-session'];
+const MUTATING_PATHS = ['/api/archive-session', '/api/restore-session', '/api/pin-session'];
 
 function isMethodAllowed(method, pathname) {
   if (method === 'GET' || method === 'HEAD') return true;

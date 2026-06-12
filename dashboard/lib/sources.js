@@ -19,7 +19,13 @@ const { resolveSafe } = require('./util');
 async function listTaskFiles(config, baseDir) {
   const taskDirRel = config.taskDir || '../tasks';
   const taskDir = path.resolve(baseDir, taskDirRel);
-  const entries = await fsp.readdir(taskDir, { withFileTypes: true });
+  let entries;
+  try {
+    entries = await fsp.readdir(taskDir, { withFileTypes: true });
+  } catch (err) {
+    if (err.code === 'ENOENT') return [];
+    throw err;
+  }
   const files = entries
     .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.md'))
     .map((entry) => entry.name)
@@ -42,7 +48,13 @@ async function listTaskFiles(config, baseDir) {
  * @returns {Promise<Array<{name,modifiedAt,content}>>}
  */
 async function listMarkdownIn(dir, prefix) {
-  const entries = await fsp.readdir(dir, { withFileTypes: true });
+  let entries;
+  try {
+    entries = await fsp.readdir(dir, { withFileTypes: true });
+  } catch (err) {
+    if (err.code === 'ENOENT') return [];
+    throw err;
+  }
   const files = entries
     .filter((e) => e.isFile() && e.name.endsWith('.md') && (!prefix || e.name.startsWith(prefix)))
     .map((e) => e.name)
@@ -63,7 +75,13 @@ async function listMarkdownIn(dir, prefix) {
  * @returns {Promise<Array<{name,content}>>}
  */
 async function listSkillsIn(skillsDir) {
-  const entries = await fsp.readdir(skillsDir, { withFileTypes: true });
+  let entries;
+  try {
+    entries = await fsp.readdir(skillsDir, { withFileTypes: true });
+  } catch (err) {
+    if (err.code === 'ENOENT') return [];
+    throw err;
+  }
   const results = [];
   for (const dir of entries.filter((e) => e.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
     const skillFile = path.join(skillsDir, dir.name, 'SKILL.md');
@@ -76,13 +94,16 @@ async function listSkillsIn(skillsDir) {
 }
 
 /**
- * tmux の "agents" セッションのペイン稼働状況を取得する。tmux が無ければ空配列。
+ * tmux セッションのペイン稼働状況を取得する。tmux が無ければ空配列。
+ * セッション名は config.serverOnly.tmuxSession（既定 "agents"）。
+ * @param {object} [config]
  * @returns {Promise<Array<{window,title,command,path}>>}
  */
-function tmuxPanes() {
+function tmuxPanes(config) {
+  const session = config?.serverOnly?.tmuxSession || 'agents';
   return new Promise((resolve) => {
     execFile('tmux',
-      ['list-panes', '-s', '-t', 'agents', '-F', '#{window_name}|||#{pane_title}|||#{pane_current_command}|||#{pane_current_path}'],
+      ['list-panes', '-s', '-t', session, '-F', '#{window_name}|||#{pane_title}|||#{pane_current_command}|||#{pane_current_path}'],
       { timeout: 3000 },
       (err, stdout) => {
         if (err || !stdout) return resolve([]);

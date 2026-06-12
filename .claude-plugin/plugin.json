@@ -1,7 +1,7 @@
 {
   "name": "agent-team-pack",
   "displayName": "Agent Team Pack",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "サブスク枠内でAIエージェントチームを運用する基盤。永続記憶＋監視ダッシュボード＋セッション管理。すべてLLMを呼ばない＝追加課金ゼロ。",
   "author": { "name": "合同会社どうぶつえん" },
   "homepage": "https://github.com/dbtnrobo/agent-team-pack",
@@ -13,7 +13,7 @@
     "monitors": [
       {
         "name": "agent-dashboard",
-        "command": "\"${CLAUDE_PLUGIN_ROOT}/dashboard/start.sh\"",
+        "command": "bash \"${CLAUDE_PLUGIN_ROOT}/dashboard/start.sh\"",
         "description": "エージェント監視ダッシュボード（:8080・read-only・LLM非依存）",
         "when": "always"
       }

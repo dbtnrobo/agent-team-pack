@@ -6,7 +6,11 @@ set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 PORT="${PORT:-8080}"
 if curl -sf -o /dev/null --max-time 2 "http://127.0.0.1:${PORT}/api/health" 2>/dev/null; then
-  echo "dashboard already running on :${PORT} — nothing to do"
+  # 既に稼働中なら「監視向けの標準出力」は一切出さずに終える。
+  # plugin monitor は command の stdout を1行ごとに通知イベント化するため、
+  # 毎回 "nothing to do" を stdout に吐くと、何もしない監視セッションが量産される。
+  # 人間が手動実行した時の確認用メッセージだけ stderr へ逃がす（stderr は通知化されない）。
+  echo "dashboard already running on :${PORT} — nothing to do" >&2
   exit 0
 fi
 [ -f config.json ] || cp config.example.json config.json
